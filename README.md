@@ -1,0 +1,2 @@
+# Merge_data_to_Dorobot
+Dorobot数据基于lerobotv2.1,增加了传感器数据和参数文件。提供将多个单条的Dorobot数据合并成整体。
