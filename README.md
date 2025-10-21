@@ -6,6 +6,21 @@
 
 ---
 
+## 📝 说明文件夹 merge_and_convert_to_robotics
+1. **功能介绍**
+   - 合并数据成CoRobot
+   - 设置已合并标记
+   - 将CoRobot转换成Robotics
+2. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. **程序入口**
+   ```bash
+   python main.py  
+   ```
+---
+
 ## 🛠️ 环境要求
 - **Python 版本**: 3.10 或更高  
 - **依赖包**: 见 [`requirements.txt`](requirements.txt)
@@ -20,7 +35,7 @@ pip install -r requirements.txt
 
 ### 2. 运行程序
 ```bash
-python main.py  # 替换为你的入口脚本
+python main.py  
 ```
 
 ---
