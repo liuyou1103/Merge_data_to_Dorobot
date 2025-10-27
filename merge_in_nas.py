@@ -188,67 +188,67 @@ class DoRobotDataMerger:
             logging.error(f"读取info.json失败: {str(e)}")
             return None
 
-    def _compile_images_to_videos(self, input_dirs: List[Path]) -> None:
-        """
-        将图像序列编译为视频文件（.avi和.mp4格式）
+    # def _compile_images_to_videos(self, input_dirs: List[Path]) -> None:
+    #     """
+    #     将图像序列编译为视频文件（.avi和.mp4格式）
 
-        Args:
-            input_dirs: 包含images目录的输入路径列表
-        """
-        for input_dir in input_dirs:
-            images_dir = input_dir / "images"
-            meta_dir = input_dir / "meta"
-            fps = self.read_info_json(meta_dir)
-            if fps is None:
-                raise ValueError("无法读取FPS值，跳过编译")
+    #     Args:
+    #         input_dirs: 包含images目录的输入路径列表
+    #     """
+    #     for input_dir in input_dirs:
+    #         images_dir = input_dir / "images"
+    #         meta_dir = input_dir / "meta"
+    #         fps = self.read_info_json(meta_dir)
+    #         if fps is None:
+    #             raise ValueError("无法读取FPS值，跳过编译")
 
-            camera_images_path_name = []
-            for camera_images_path in images_dir.iterdir():
-                if not camera_images_path.is_dir():
-                    continue
+    #         camera_images_path_name = []
+    #         for camera_images_path in images_dir.iterdir():
+    #             if not camera_images_path.is_dir():
+    #                 continue
                     
-                camera_images = camera_images_path.name
-                camera_images_path_name.append(camera_images)
-                img_list, video_list, depth_video_path_list = self.get_img_video_path(input_dir, camera_images, camera_images_path)
+    #             camera_images = camera_images_path.name
+    #             camera_images_path_name.append(camera_images)
+    #             img_list, video_list, depth_video_path_list = self.get_img_video_path(input_dir, camera_images, camera_images_path)
 
-                if 'depth' in camera_images:
-                    # 处理深度图像
-                    if img_list:
-                        for img_path, video_path in zip(img_list, depth_video_path_list):
-                            logging.info(f"处理深度图像: {img_path} -> {video_path}")
-                            if not self.encode_depth_video_frames(img_path, video_path, fps):
-                                logging.warning(f"深度视频编码失败: {video_path}")
-                else:
-                    # 处理普通图像
-                    if img_list:
-                        for img_path, video_path in zip(img_list, video_list):
-                            logging.info(f"处理普通图像(mp4): {img_path} -> {video_path}")
-                            if not self.encode_video_frames(img_path, video_path, fps):
-                                logging.warning(f"普通视频编码失败: {video_path}")
+    #             if 'depth' in camera_images:
+    #                 # 处理深度图像
+    #                 if img_list:
+    #                     for img_path, video_path in zip(img_list, depth_video_path_list):
+    #                         logging.info(f"处理深度图像: {img_path} -> {video_path}")
+    #                         if not self.encode_depth_video_frames(img_path, video_path, fps):
+    #                             logging.warning(f"深度视频编码失败: {video_path}")
+    #             else:
+    #                 # 处理普通图像
+    #                 if img_list:
+    #                     for img_path, video_path in zip(img_list, video_list):
+    #                         logging.info(f"处理普通图像(mp4): {img_path} -> {video_path}")
+    #                         if not self.encode_video_frames(img_path, video_path, fps):
+    #                             logging.warning(f"普通视频编码失败: {video_path}")
 
-            # 更新元数据
-            with open(meta_dir / "info.json", "r", encoding="utf-8") as f:
-                metadata = json.load(f)
+    #         # 更新元数据
+    #         with open(meta_dir / "info.json", "r", encoding="utf-8") as f:
+    #             metadata = json.load(f)
                 
-            if "features" not in metadata:
-                logging.warning("无效元数据: 缺少'features'字段")
-            else:  
-                for field_name, field_info in metadata["features"].items():
-                    if field_name in camera_images_path_name:
-                        field_info["dtype"] = "video"
+    #         if "features" not in metadata:
+    #             logging.warning("无效元数据: 缺少'features'字段")
+    #         else:  
+    #             for field_name, field_info in metadata["features"].items():
+    #                 if field_name in camera_images_path_name:
+    #                     field_info["dtype"] = "video"
                     
-            metadata.update({
-                "total_videos": 1,
-                "video_path": "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4",
-                "image_path": None
-            })
+    #         metadata.update({
+    #             "total_videos": 1,
+    #             "video_path": "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4",
+    #             "image_path": None
+    #         })
             
-            with open(meta_dir / "info.json", "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=4, ensure_ascii=False)
+    #         with open(meta_dir / "info.json", "w", encoding="utf-8") as f:
+    #             json.dump(metadata, f, indent=4, ensure_ascii=False)
                 
-            # 删除原始images目录
-            shutil.rmtree(images_dir)
-            logging.info(f"已完成图像编译: {input_dir}")
+    #         # 删除原始images目录
+    #         shutil.rmtree(images_dir)
+    #         logging.info(f"已完成图像编译: {input_dir}")
 
     def _get_current_code_version(self) -> str:
         """获取当前代码版本"""
@@ -594,148 +594,148 @@ class DoRobotDataMerger:
                 json.dump(metadata, f, indent=4, ensure_ascii=False)
             break
 
-    @staticmethod
-    def encode_video_frames(imgs_dir: Union[Path, str], video_path: Union[Path, str], fps: int) -> bool:
-        """
-        编码普通视频帧（自动检测图片后缀）
+    # @staticmethod
+    # def encode_video_frames(imgs_dir: Union[Path, str], video_path: Union[Path, str], fps: int) -> bool:
+    #     """
+    #     编码普通视频帧（自动检测图片后缀）
 
-        Args:
-            imgs_dir: 包含图像序列的目录
-            video_path: 输出视频路径
-            fps: 帧率
+    #     Args:
+    #         imgs_dir: 包含图像序列的目录
+    #         video_path: 输出视频路径
+    #         fps: 帧率
 
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            imgs_dir = Path(imgs_dir)
-            video_path = Path(video_path)
-            video_path.parent.mkdir(parents=True, exist_ok=True)
+    #     Returns:
+    #         bool: 是否成功
+    #     """
+    #     try:
+    #         imgs_dir = Path(imgs_dir)
+    #         video_path = Path(video_path)
+    #         video_path.parent.mkdir(parents=True, exist_ok=True)
             
-            supported_extensions = ['.jpg', '.jpeg', '.png']
-            detected_ext = None
-            for ext in supported_extensions:
-                if list(imgs_dir.glob(f"*{ext}")):
-                    detected_ext = ext
-                    break
+    #         supported_extensions = ['.jpg', '.jpeg', '.png']
+    #         detected_ext = None
+    #         for ext in supported_extensions:
+    #             if list(imgs_dir.glob(f"*{ext}")):
+    #                 detected_ext = ext
+    #                 break
             
-            if not detected_ext:
-                raise ValueError(f"未找到支持的图片文件（支持: {', '.join(supported_extensions)}）")
+    #         if not detected_ext:
+    #             raise ValueError(f"未找到支持的图片文件（支持: {', '.join(supported_extensions)}）")
             
-            ffmpeg_args = OrderedDict([
-                ("-f", "image2"),
-                ("-r", str(fps)),
-                ("-i", str(imgs_dir / f"frame_%06d{detected_ext}")),
-                ("-vcodec", "libx264"),
-                ("-pix_fmt", "yuv420p"),
-                ("-g", "5"),
-                ("-crf", "18"),
-                ("-loglevel", "error"),
-            ])
+    #         ffmpeg_args = OrderedDict([
+    #             ("-f", "image2"),
+    #             ("-r", str(fps)),
+    #             ("-i", str(imgs_dir / f"frame_%06d{detected_ext}")),
+    #             ("-vcodec", "libx264"),
+    #             ("-pix_fmt", "yuv420p"),
+    #             ("-g", "5"),
+    #             ("-crf", "18"),
+    #             ("-loglevel", "error"),
+    #         ])
             
-            ffmpeg_cmd = ["ffmpeg"] + [item for pair in ffmpeg_args.items() for item in pair] + [str(video_path)]
-            subprocess.run(ffmpeg_cmd, check=True)
+    #         ffmpeg_cmd = ["ffmpeg"] + [item for pair in ffmpeg_args.items() for item in pair] + [str(video_path)]
+    #         subprocess.run(ffmpeg_cmd, check=True)
             
-            if not video_path.exists():
-                raise OSError(f"视频文件未生成: {video_path}")
+    #         if not video_path.exists():
+    #             raise OSError(f"视频文件未生成: {video_path}")
                 
-            logging.info(f"普通视频编码成功: {video_path}")
-            return True
-        except Exception as e:
-            logging.error(f"普通视频编码失败: {str(e)}")            
-            return False
+    #         logging.info(f"普通视频编码成功: {video_path}")
+    #         return True
+    #     except Exception as e:
+    #         logging.error(f"普通视频编码失败: {str(e)}")            
+    #         return False
 
-    @staticmethod
-    def encode_label_video_frames(imgs_dir: Union[Path, str], video_path: Union[Path, str], fps: int) -> bool:
-        """
-        编码标签视频帧
+    # @staticmethod
+    # def encode_label_video_frames(imgs_dir: Union[Path, str], video_path: Union[Path, str], fps: int) -> bool:
+    #     """
+    #     编码标签视频帧
 
-        Args:
-            imgs_dir: 包含图像序列的目录
-            video_path: 输出视频路径
-            fps: 帧率
+    #     Args:
+    #         imgs_dir: 包含图像序列的目录
+    #         video_path: 输出视频路径
+    #         fps: 帧率
 
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            imgs_dir = Path(imgs_dir)
-            video_path = Path(video_path)
-            video_path.parent.mkdir(parents=True, exist_ok=True)
+    #     Returns:
+    #         bool: 是否成功
+    #     """
+    #     try:
+    #         imgs_dir = Path(imgs_dir)
+    #         video_path = Path(video_path)
+    #         video_path.parent.mkdir(parents=True, exist_ok=True)
             
-            supported_extensions = ['.jpg', '.jpeg', '.png']
-            detected_ext = None
-            for ext in supported_extensions:
-                if list(imgs_dir.glob(f"*{ext}")):
-                    detected_ext = ext
-                    break
+    #         supported_extensions = ['.jpg', '.jpeg', '.png']
+    #         detected_ext = None
+    #         for ext in supported_extensions:
+    #             if list(imgs_dir.glob(f"*{ext}")):
+    #                 detected_ext = ext
+    #                 break
             
-            if not detected_ext:
-                raise ValueError(f"未找到支持的图片文件（支持: {', '.join(supported_extensions)}）")
+    #         if not detected_ext:
+    #             raise ValueError(f"未找到支持的图片文件（支持: {', '.join(supported_extensions)}）")
             
-            ffmpeg_args = OrderedDict([
-                ("-f", "image2"),
-                ("-r", str(fps)),
-                ("-i", str(imgs_dir / f"frame_%06d{detected_ext}")),
-                ("-vcodec", "libx264"),
-                ("-pix_fmt", "yuv420p"),
-                ("-g", "20"),
-                ("-crf", "23"),
-                ("-loglevel", "error"),
-            ])
+    #         ffmpeg_args = OrderedDict([
+    #             ("-f", "image2"),
+    #             ("-r", str(fps)),
+    #             ("-i", str(imgs_dir / f"frame_%06d{detected_ext}")),
+    #             ("-vcodec", "libx264"),
+    #             ("-pix_fmt", "yuv420p"),
+    #             ("-g", "20"),
+    #             ("-crf", "23"),
+    #             ("-loglevel", "error"),
+    #         ])
             
-            ffmpeg_cmd = ["ffmpeg"] + [item for pair in ffmpeg_args.items() for item in pair] + [str(video_path)]
-            subprocess.run(ffmpeg_cmd, check=True)
+    #         ffmpeg_cmd = ["ffmpeg"] + [item for pair in ffmpeg_args.items() for item in pair] + [str(video_path)]
+    #         subprocess.run(ffmpeg_cmd, check=True)
             
-            if not video_path.exists():
-                raise OSError(f"视频文件未生成: {video_path}")
+    #         if not video_path.exists():
+    #             raise OSError(f"视频文件未生成: {video_path}")
                 
-            logging.info(f"标签视频编码成功: {video_path}")
-            return True
-        except Exception as e:
-            logging.error(f"标签视频编码失败: {str(e)}")
-            return False
+    #         logging.info(f"标签视频编码成功: {video_path}")
+    #         return True
+    #     except Exception as e:
+    #         logging.error(f"标签视频编码失败: {str(e)}")
+    #         return False
 
-    @staticmethod
-    def encode_depth_video_frames(imgs_dir: Union[Path, str], video_path: Union[Path, str], fps: int) -> bool:
-        """
-        编码深度视频帧
+    # @staticmethod
+    # def encode_depth_video_frames(imgs_dir: Union[Path, str], video_path: Union[Path, str], fps: int) -> bool:
+    #     """
+    #     编码深度视频帧
 
-        Args:
-            imgs_dir: 包含深度图像序列的目录
-            video_path: 输出视频路径
-            fps: 帧率
+    #     Args:
+    #         imgs_dir: 包含深度图像序列的目录
+    #         video_path: 输出视频路径
+    #         fps: 帧率
 
-        Returns:
-            bool: 是否成功
-        """
-        try:
-            imgs_dir = Path(imgs_dir)
-            video_path = Path(video_path)
-            video_path.parent.mkdir(parents=True, exist_ok=True)
+    #     Returns:
+    #         bool: 是否成功
+    #     """
+    #     try:
+    #         imgs_dir = Path(imgs_dir)
+    #         video_path = Path(video_path)
+    #         video_path.parent.mkdir(parents=True, exist_ok=True)
 
-            ffmpeg_args = [
-                "ffmpeg",
-                "-f", "image2",
-                "-r", str(fps),
-                "-i", str(imgs_dir / "frame_%06d.png"),
-                "-vcodec", "ffv1",
-                "-loglevel", "error",
-                "-pix_fmt", "gray16le",
-                "-y",
-                str(video_path)
-            ]
+    #         ffmpeg_args = [
+    #             "ffmpeg",
+    #             "-f", "image2",
+    #             "-r", str(fps),
+    #             "-i", str(imgs_dir / "frame_%06d.png"),
+    #             "-vcodec", "ffv1",
+    #             "-loglevel", "error",
+    #             "-pix_fmt", "gray16le",
+    #             "-y",
+    #             str(video_path)
+    #         ]
             
-            subprocess.run(ffmpeg_args, check=True)
+    #         subprocess.run(ffmpeg_args, check=True)
             
-            if not video_path.exists():
-                raise OSError(f"视频文件未生成: {video_path}")
+    #         if not video_path.exists():
+    #             raise OSError(f"视频文件未生成: {video_path}")
                 
-            logging.info(f"深度视频编码成功: {video_path}")
-            return True
-        except Exception as e:
-            logging.error(f"深度视频编码失败: {str(e)}")
-            return False
+    #         logging.info(f"深度视频编码成功: {video_path}")
+    #         return True
+    #     except Exception as e:
+    #         logging.error(f"深度视频编码失败: {str(e)}")
+    #         return False
 
     def prepare_merge(self, data_paths: List[Path]) -> bool:
         """
@@ -792,11 +792,11 @@ class DoRobotDataMerger:
             # 分类数据目录
             data_compile_list = [d for d in self.data_dirs if (d / "images").exists()]
 
-            # 1. 编译图像数据为视频格式
-            if data_compile_list:
-                logging.info(f"正在编译 {len(data_compile_list)} 个图像数据集为视频格式...")
-                self._compile_images_to_videos(data_compile_list)
-                logging.info("编译完成")
+            # # 1. 编译图像数据为视频格式
+            # if data_compile_list:
+            #     logging.info(f"正在编译 {len(data_compile_list)} 个图像数据集为视频格式...")
+            #     self._compile_images_to_videos(data_compile_list)
+            #     logging.info("编译完成")
 
             if not self.prepare_merge(self.data_dirs):
                 logging.error("合并准备阶段失败")

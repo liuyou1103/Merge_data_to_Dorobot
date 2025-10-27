@@ -86,6 +86,7 @@ def handle_single_data(single_path: Path, merge_path: Path, log_path: Path):
                     print(f"合并失败: {str(e)}")
 
 if __name__ == "__main__":
+    # 功能： 1、合并数据成CoRobot 2、设置已合并标记, 该脚本仅合并，没有转换！！! 
     # 示例路径（根据实际需求修改）
     # 合并后数据路径
     merge_path = Path("/home/liuyou/Documents/merge_data")

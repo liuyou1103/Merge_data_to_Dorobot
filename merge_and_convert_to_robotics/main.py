@@ -4,6 +4,7 @@ import json
 from typing import Optional, List
 from datetime import datetime
 from curobot2train_format import get_args, CoRobot2Train
+import shutil
 
 
 def get_folders(data_path: Path) -> Optional[List[str]]:
@@ -59,6 +60,19 @@ def take_merge_tag(task_path):
         print(f"Error creating merge tag file: {e}")
         return None
     
+def delete_directory(path: str):
+        """
+        删除目录
+        
+        Args:
+            path (str): 要删除的目录路径
+        """
+        try:
+            shutil.rmtree(path)
+            print(f"[INFO] 成功删除目录: {path}")
+        except OSError as e:
+            print(f"[ERROR] 删除目录失败: {path}, 错误: {e.strerror}")
+    
 def handle_single_data(single_path: Path, single_folder_name: List[str], merge_path: Path, log_file: bool, log_path: Path,):
     """处理单个数据目录"""
     CoRobot_merge_path = merge_path / "CoRobot"
@@ -98,6 +112,8 @@ def handle_single_data(single_path: Path, single_folder_name: List[str], merge_p
                         args = get_args(argv)
                         processor = CoRobot2Train(args)
                         processor.run()
+                        # 4、删除corobot数据
+                        delete_directory(str(task_CoRobot_merge_path))
 
                 except Exception as e:
                     print(f"失败: {str(e)}")
