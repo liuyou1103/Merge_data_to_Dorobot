@@ -263,13 +263,7 @@ class CoRobot2Train:
             ### 2, transfer state  
             target_qpos_indices = [state_column_names.index(dim) for dim in qpos_target_names]
             state_qpos = np.array([[lst[idx] for idx in target_qpos_indices] for lst in state])
-            state_qpos = np.concatenate(
-                [
-                    state_qpos[1:,:6],
-                    state_qpos[1:,[6]],
-                ],
-                axis=-1
-            )
+            
             ## joint7 + gripper = 8
             state_qpos_list.extend(state_qpos)
         
@@ -373,9 +367,9 @@ class CoRobot2Train:
             images_path = os.path.join(self.args.output_image_path, uuid)
             os.makedirs(images_path, exist_ok=True)
 
-            ## TODO need task name and annotation info 
-            raw_task = '' 
-            sub_task = ''
+            ## directly use corobot record task name
+            raw_task = self.common_record['task_name']
+            sub_task = self.common_record['task_name']
 
             ## split trajectory
             json_entries = []
@@ -420,7 +414,7 @@ class CoRobot2Train:
                         axis=-1,
                     )
                 except Exception as exc:
-                    logger.error("Failed to build action delta for item %s/%s – %s", uuid, i, exc)
+                    print("Failed to build action delta for item %s/%s – %s", uuid, i, exc)
                     continue
                     
                 nor_action_delta = self.transform(action_eepose_delta, self.action_eepose_scale, self.action_eepose_offset)
@@ -491,6 +485,10 @@ class CoRobot2Train:
 
         with open(os.path.join(self.args.data_path, 'meta', 'info.json')) as f:
             self.info = json.load(f)
+
+        with open(os.path.join(self.args.data_path, 'meta', 'common_record.json')) as f:
+            self.common_record = json.load(f)
+
         ## compute and load action norm para
         if not os.path.exists(self.args.norm_path):
             self.compute_norm()
