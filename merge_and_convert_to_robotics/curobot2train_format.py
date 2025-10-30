@@ -370,8 +370,17 @@ class CoRobot2Train:
 
             ## directly use corobot record task name
             task_name_json = self.common_record['task_name'].split('_')[0]
-            raw_task = re.match(r'^[a-zA-Z\s.]+', task_name_json)
-            sub_task = re.match(r'^[a-zA-Z\s.]+', task_name_json)
+
+            # 检查是否包含英文字母
+            if re.search(r'[a-zA-Z]', task_name_json):
+                # 如果包含英文，提取开头的英文部分
+                match = re.match(r'^[a-zA-Z\s.]+', task_name_json)
+                raw_task = match.group() if match else task_name_json
+                sub_task = match.group() if match else task_name_json
+            else:
+                # 如果不包含英文，直接使用原字符串
+                raw_task = task_name_json
+                sub_task = task_name_json
 
             ## split trajectory
             json_entries = []
