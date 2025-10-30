@@ -7,6 +7,7 @@ import argparse
 import json
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
+import re
 
 from data_utils.pose_transform import quat_to_6d, euler_to_6d, compute_d6_axis_angle_deltas
 from data_utils.action_token.action_chunk_to_fast_token import ActionChunkProcessor
@@ -368,8 +369,9 @@ class CoRobot2Train:
             os.makedirs(images_path, exist_ok=True)
 
             ## directly use corobot record task name
-            raw_task = self.common_record['task_name']
-            sub_task = self.common_record['task_name']
+            task_name_json = self.common_record['task_name'].split('_')[0]
+            raw_task = re.match(r'^[a-zA-Z\s.]+', task_name_json)
+            sub_task = re.match(r'^[a-zA-Z\s.]+', task_name_json)
 
             ## split trajectory
             json_entries = []
