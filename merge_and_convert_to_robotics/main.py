@@ -1,9 +1,9 @@
-from .merge_in_nas import DoRobotDataMerger, test
+from merge_in_nas import DoRobotDataMerger
 from pathlib import Path
 import json
 from typing import Optional, List
 from datetime import datetime
-from .curobot2train_format import get_args, CoRobot2Train
+from curobot2train_format import get_args, CoRobot2Train
 import shutil
 
 output_type_list = ['CoRobot','Robotics_Franka']  # 提供的输出的数据类型
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     # 示例：single_path下，存在数据文件夹："水果收纳","餐具收纳","衣物收纳"
     single_path = Path("/home/liuyou/Documents/single_data/")
     # 也可以选择传递具体数据文件夹名
-    single_folder_name = ["刷透明试管_试用角色测试新建模版_346"]
+    single_folder_name = ["Place the object into the container_PNP_1104_603"]
 
     # 合并后数据路径,会自动拼接标识子目录
     merge_path = Path("/home/liuyou/Documents/merge_data")

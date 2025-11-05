@@ -911,6 +911,6 @@ class DoRobotDataMerger:
                 if temp_file.exists():
                     temp_file.unlink()  # 清理临时文件
                 continue
-    
+        logging.info("\n")
         logging.info(f"   总处理文件数: {len(parquet_files)}")
         logging.info(f"   总帧数: {global_frame_index}")
