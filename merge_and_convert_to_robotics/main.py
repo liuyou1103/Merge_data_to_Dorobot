@@ -1,11 +1,12 @@
-from merge_in_nas import DoRobotDataMerger
+from .merge_in_nas import DoRobotDataMerger, test
 from pathlib import Path
 import json
 from typing import Optional, List
 from datetime import datetime
-from curobot2train_format import get_args, CoRobot2Train
+from .curobot2train_format import get_args, CoRobot2Train
 import shutil
 
+output_type_list = ['CoRobot','Robotics_Franka']  # 提供的输出的数据类型
 
 def get_folders(data_path: Path) -> Optional[List[str]]:
     """获取路径下的所有文件夹"""
@@ -73,7 +74,7 @@ def delete_directory(path: str):
         except OSError as e:
             print(f"[ERROR] 删除目录失败: {path}, 错误: {e.strerror}")
     
-def handle_single_data(single_path: Path, single_folder_name: List[str], merge_path: Path, log_file: bool, log_path: Path,):
+def handle_single_data(single_path: Path, single_folder_name: List[str], merge_path: Path, log_file: bool, log_path: Path, output_type: str):
     """处理单个数据目录"""
     CoRobot_merge_path = merge_path / "CoRobot"
     Robotics_merge_path = merge_path / "Robotics"
@@ -103,20 +104,21 @@ def handle_single_data(single_path: Path, single_folder_name: List[str], merge_p
                         # 2、设置已合并标记
                         take_merge_tag(task_path)
                         # 3、将CoRobot转换成Robotics
-                        task_CoRobot_merge_path = CoRobot_merge_path/ folder
-                        task_Robotics_merge_path = Robotics_merge_path / folder
-                        argv=[
-                        "--data_path", str(task_CoRobot_merge_path),
-                        "--output_data_path", str(task_Robotics_merge_path)
-                        ]
-                        args = get_args(argv)
-                        processor = CoRobot2Train(args)
-                        processor.run()
-                        # 4、删除corobot数据
-                        delete_directory(str(task_CoRobot_merge_path))
-
+                        if output_type == 'Robotics_Franka':
+                            task_CoRobot_merge_path = CoRobot_merge_path/ folder
+                            task_Robotics_merge_path = Robotics_merge_path / folder
+                            argv=[
+                            "--data_path", str(task_CoRobot_merge_path),
+                            "--output_data_path", str(task_Robotics_merge_path)
+                            ]
+                            args = get_args(argv)
+                            processor = CoRobot2Train(args)
+                            processor.run()
+                            # 4、删除corobot数据
+                            delete_directory(str(task_CoRobot_merge_path))
+                        print(f"\n🎉 所有文件处理完成!")
                 except Exception as e:
-                    print(f"失败: {str(e)}")
+                    print(f"处理失败: {str(e)}")
 
 if __name__ == "__main__":
     # 功能： 1、合并数据成CoRobot 2、设置已合并标记  3、将CoRobot转换成Robotics
@@ -128,12 +130,16 @@ if __name__ == "__main__":
     # 也可以选择传递具体数据文件夹名
     single_folder_name = ["刷透明试管_试用角色测试新建模版_346"]
 
-     # 合并后数据路径,会自动拼接标识子目录
+    # 合并后数据路径,会自动拼接标识子目录
     merge_path = Path("/home/liuyou/Documents/merge_data")
 
     # 是否启用文件日志
     log_file = False
-     # 日志路径
+    # 日志路径
     log_path = Path("/home/liuyou/Documents/logs/")
-    
-    handle_single_data(single_path, single_folder_name, merge_path, log_file, log_path)
+
+    output_type_list = ['CoRobot','Robotics_Franka'] # 提供的输出的数据类型
+
+    output_type = 'Robotics_Franka'
+
+    handle_single_data(single_path, single_folder_name, merge_path, log_file, log_path, output_type)
