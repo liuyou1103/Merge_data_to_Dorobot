@@ -8,7 +8,6 @@ import json
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 import re
-import subprocess
 from data_utils.pose_transform import quat_to_6d, euler_to_6d, compute_d6_axis_angle_deltas
 from data_utils.action_token.action_chunk_to_fast_token import ActionChunkProcessor
 
@@ -293,6 +292,18 @@ class CoRobot2Train:
             else:
                 print(f"警告: {key}为空，跳过归一化拟合")
         return result_dict
+    
+    def is_video_valid(self, video_path):
+        """检查视频文件是否可被 OpenCV 读取"""
+        if not os.path.exists(video_path):
+            return False
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return False
+        # 尝试读取 1 帧（避免读取整个文件）
+        ret, _ = cap.read()
+        cap.release()
+        return ret
 
     def process_trajectory(self):
         action_tokenizer = get_tokenizer(max_len=256)
@@ -302,11 +313,14 @@ class CoRobot2Train:
                     video_path = episode_path.replace('/data/', '/videos/').replace('.parquet', '.mp4')
                     image_names = ['observation.images.image_front', 'observation.images.image_wrist']
                     front_mp4_path, wrist_mp4_path = ["/".join(video_path.split('/')[:-1] + [_] + video_path.split('/')[-1:]) for _ in image_names]
-                    cmd = ["ffmpeg", "-v", "error", "-i", front_mp4_path, "-f", "null", "-"]
-                    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
-                    cmd = ["ffmpeg", "-v", "error", "-i", wrist_mp4_path, "-f", "null", "-"]
-                    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
-                except subprocess.CalledProcessError:
+                    # cmd = ["ffmpeg", "-v", "error", "-i", front_mp4_path, "-f", "null", "-"]
+                    # subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+                    # cmd = ["ffmpeg", "-v", "error", "-i", wrist_mp4_path, "-f", "null", "-"]
+                    # subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+                    # 用轻量级校验替代 ffmpeg
+                    if not self.is_video_valid(front_mp4_path) or not self.is_video_valid(wrist_mp4_path):
+                        continue  # 无效文件跳过
+                except:
                     continue
                 df = pd.read_parquet(episode_path)
                 action = df['action']
