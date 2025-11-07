@@ -8,7 +8,7 @@ import json
 import pandas as pd
 from sklearn.base import BaseEstimator, TransformerMixin
 import re
-
+import subprocess
 from data_utils.pose_transform import quat_to_6d, euler_to_6d, compute_d6_axis_angle_deltas
 from data_utils.action_token.action_chunk_to_fast_token import ActionChunkProcessor
 
@@ -297,188 +297,200 @@ class CoRobot2Train:
     def process_trajectory(self):
         action_tokenizer = get_tokenizer(max_len=256)
         for episode_i, episode_path in tqdm(enumerate(self.all_episodes)):
-            df = pd.read_parquet(episode_path)
-
-            action = df['action']
-            state = df['observation.state']
-
-            video_path = episode_path.replace('/data/', '/videos/').replace('.parquet', '.mp4')
-            image_names = ['observation.images.image_front', 'observation.images.image_wrist']
-            front_mp4_path, wrist_mp4_path = ["/".join(video_path.split('/')[:-1] + [_] + video_path.split('/')[-1:]) for _ in image_names]
-            ## TODO 考虑到比赛使用的是Franka，理论上这里的样例维度和比赛采集的数据有所不同，这里只选用右手数据
-            action_column_names = self.info["features"]["action"]["names"]
-            state_column_names = self.info["features"]["observation.state"]["names"]
-            eepose_target_names = [
-                "main_follower_pose_x",
-                "main_follower_pose_y",
-                "main_follower_pose_z",
-                "main_follower_rotation_euler_roll",
-                "main_follower_rotation_euler_pitch",
-                "main_follower_rotation_euler_yaw",
-                "main_follower_gripper", # main_follower_gripper_open
-            ]
-            qpos_target_names = [
-                "main_follower_joint_1",
-                "main_follower_joint_2",
-                "main_follower_joint_3",
-                "main_follower_joint_4",
-                "main_follower_joint_5",
-                "main_follower_joint_6",
-                "main_follower_joint_7",
-                "main_follower_gripper", # main_follower_gripper_open
-            ]
-
-            ## compute delta action eepose
-            ### 1, get absolute action eepose
-            ### 2, transfer action eepose to delta action eepose
-            #### (1) compute delta
-            #### (2) transfer quat to delta axis angle
-            target_eepose_indices = [action_column_names.index(dim) for dim in eepose_target_names]
-            action_eepose = np.array(np.array([[lst[idx] for idx in target_eepose_indices] for lst in action]))
-
-            ## compute delta action qpos
-            ### 1, get absolute action qpos
-            ### 2, transfer action qpos to delta action qpos
-            #### (1) compute delta
-            target_qpos_indices = [action_column_names.index(dim) for dim in qpos_target_names]
-            action_qpos = np.array(np.array([[lst[idx] for idx in target_qpos_indices] for lst in action]))
-
-            ## compute state eepose
-            ### 1, get state eepose
-            ### 2, transfer state eepose 
-            #### (1) transfer quat to 6d
-            target_eepose_indices = [state_column_names.index(dim) for dim in eepose_target_names]
-            state_eepose = np.array([[lst[idx] for idx in target_eepose_indices] for lst in state])
-            state_eepose = np.concatenate(
-                [
-                    state_eepose[1:,:3],
-                    euler_to_6d(state_eepose[1:,3:6]),
-                    state_eepose[1:,[6]],
-                ],
-                axis=-1
-            )
-
-            ## compute state qpos
-            ### 1, get state qpos
-            ### 2, transfer state  
-            target_qpos_indices = [state_column_names.index(dim) for dim in qpos_target_names]
-            state_qpos = np.array([[lst[idx] for idx in target_qpos_indices] for lst in state])
-
-            uuid = f"{self.info['robot_type']}_{df['task_index'][0]}_{df['episode_index'][0]}"
-            images_path = os.path.join(self.args.output_image_path, uuid)
-            os.makedirs(images_path, exist_ok=True)
-
-            ## directly use corobot record task name
-            task_name_json = self.common_record['task_name'].split('_')[0]
-
-            # 检查是否包含英文字母
-            if re.search(r'[a-zA-Z]', task_name_json):
-                # 如果包含英文，提取开头的英文部分
-                match = re.match(r'^[a-zA-Z\s.]+', task_name_json)
-                raw_task = match.group() if match else task_name_json
-                sub_task = match.group() if match else task_name_json
-            else:
-                # 如果不包含英文，直接使用原字符串
-                raw_task = task_name_json
-                sub_task = task_name_json
-
-            ## split trajectory
-            json_entries = []
-            start = int(df['frame_index'][0])
-            end = len(df['frame_index']) - 1
-            construct_num = max(1, end+self.args.padding-self.args.chunk)
-            
-            ## save video frame
-            result = self.save_video_frames(
-                video_paths=[front_mp4_path, wrist_mp4_path],
-                output_dir=images_path,
-                start_frame=start,
-                end_frame=end,
-                image_format="jpg",
-            )
-            if not result:
-                return []
-
-            for i in range(construct_num):
-                # 选择分块索引 - 用min确保不超出边界
-                index = [min(i + j, end - 1) for j in range(self.args.chunk + 1)]
-                # 获取过滤后的数据块
-                action_eepose_chunk = action_eepose[index]
-                action_qpos_chunk = action_qpos[index]
-                state_eepose_chunk = state_eepose[index]
-                state_qpos_chunk = state_qpos[index]
-                # 计算delta – 确保形状匹配
+            try:
                 try:
-                    action_eepose_delta = np.concatenate(
-                        [
-                            action_eepose_chunk[1:, :3] - action_eepose_chunk[:-1, :3],
-                            compute_d6_axis_angle_deltas(euler_to_6d(action_eepose_chunk[:, 3:6])),
-                            action_eepose_chunk[1:, [6]],
-                        ],
-                        axis=-1,
-                    )
-                    action_qpos_delta = np.concatenate(
-                        [
-                            action_qpos_chunk[1:, :7] - action_qpos_chunk[:-1, :7],
-                            action_qpos_chunk[1:, [7]],
-                        ],
-                        axis=-1,
-                    )
-                except Exception as exc:
-                    print("Failed to build action delta for item %s/%s – %s", uuid, i, exc)
+                    video_path = episode_path.replace('/data/', '/videos/').replace('.parquet', '.mp4')
+                    image_names = ['observation.images.image_front', 'observation.images.image_wrist']
+                    front_mp4_path, wrist_mp4_path = ["/".join(video_path.split('/')[:-1] + [_] + video_path.split('/')[-1:]) for _ in image_names]
+                    cmd = ["ffmpeg", "-v", "error", "-i", front_mp4_path, "-f", "null", "-"]
+                    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+                    cmd = ["ffmpeg", "-v", "error", "-i", wrist_mp4_path, "-f", "null", "-"]
+                    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+                except subprocess.CalledProcessError:
                     continue
-                    
-                nor_action_delta = self.transform(action_eepose_delta, self.action_eepose_scale, self.action_eepose_offset)
-                nor_action_qpos = self.transform(action_qpos_delta, self.action_qpos_scale, self.action_qpos_offset)
+                df = pd.read_parquet(episode_path)
+                action = df['action']
+                state = df['observation.state']
 
-                state_eepose_chunk = state_eepose_chunk[:-1]
-                state_qpos_chunk = state_qpos_chunk[:-1]
-                # 保存数组
-                # 保持0为关闭，大于1为打开
-                # 使用inverse的gripper动作作为action token
-                action_eepose_token = action_tokenizer.process_action_chunk_to_fast_token(nor_action_delta)
-                action_qpos_token = action_tokenizer.process_action_chunk_to_fast_token(nor_action_qpos)
-
-                image_path_list = [
-                    os.path.join(images_path, f"{view}_{i}.jpg")
-                    for view in ["observation_images_image_front", "observation_images_image_wrist"]
+                video_path = episode_path.replace('/data/', '/videos/').replace('.parquet', '.mp4')
+                image_names = ['observation.images.image_front', 'observation.images.image_wrist']
+                front_mp4_path, wrist_mp4_path = ["/".join(video_path.split('/')[:-1] + [_] + video_path.split('/')[-1:]) for _ in image_names]
+                ## TODO 考虑到比赛使用的是Franka，理论上这里的样例维度和比赛采集的数据有所不同，这里只选用右手数据
+                action_column_names = self.info["features"]["action"]["names"]
+                state_column_names = self.info["features"]["observation.state"]["names"]
+                eepose_target_names = [
+                    "main_follower_pose_x",
+                    "main_follower_pose_y",
+                    "main_follower_pose_z",
+                    "main_follower_rotation_euler_roll",
+                    "main_follower_rotation_euler_pitch",
+                    "main_follower_rotation_euler_yaw",
+                    "main_follower_gripper", # main_follower_gripper_open
+                ]
+                qpos_target_names = [
+                    "main_follower_joint_1",
+                    "main_follower_joint_2",
+                    "main_follower_joint_3",
+                    "main_follower_joint_4",
+                    "main_follower_joint_5",
+                    "main_follower_joint_6",
+                    "main_follower_joint_7",
+                    "main_follower_gripper", # main_follower_gripper_open
                 ]
 
-                # construct data item
-                action_str_list = ['<action_token>'] * 1
-                action_str = '<action_split>'.join(action_str_list)
-                json_item = {
-                    "sample_id": f"{uuid}_{i}",
-                    "raw_task": raw_task,
-                    "task": sub_task,
-                    "image": image_path_list,
-                    "action_eepose_token": action_eepose_token,
-                    "action_qpos_token": action_qpos_token,
-                    "state":{
-                        "eepose": state_eepose_chunk.tolist(),
-                        "qpos":state_qpos_chunk.tolist(),
-                    },
-                    "action":{
-                        "eepose": action_eepose_delta.tolist(),
-                        "qpos": action_qpos_delta.tolist(),
-                    },
-                    "conversations": [
-                        {
-                            "from": "human",
-                            "value": "".join(PROMPT).format(lan=sub_task.lower())
-                        },
-                        {
-                            "from": "gpt",
-                            "value": action_str
-                        }
-                    ]
-                }
-                json_entries.append(json_item)
+                ## compute delta action eepose
+                ### 1, get absolute action eepose
+                ### 2, transfer action eepose to delta action eepose
+                #### (1) compute delta
+                #### (2) transfer quat to delta axis angle
+                target_eepose_indices = [action_column_names.index(dim) for dim in eepose_target_names]
+                action_eepose = np.array(np.array([[lst[idx] for idx in target_eepose_indices] for lst in action]))
 
-            ## store training samples
-            for json_item in json_entries:
-                json_line = json.dumps(json_item)
-                self.json_file_writer.write(json_line+'\n')
+                ## compute delta action qpos
+                ### 1, get absolute action qpos
+                ### 2, transfer action qpos to delta action qpos
+                #### (1) compute delta
+                target_qpos_indices = [action_column_names.index(dim) for dim in qpos_target_names]
+                action_qpos = np.array(np.array([[lst[idx] for idx in target_qpos_indices] for lst in action]))
+
+                ## compute state eepose
+                ### 1, get state eepose
+                ### 2, transfer state eepose 
+                #### (1) transfer quat to 6d
+                target_eepose_indices = [state_column_names.index(dim) for dim in eepose_target_names]
+                state_eepose = np.array([[lst[idx] for idx in target_eepose_indices] for lst in state])
+                state_eepose = np.concatenate(
+                    [
+                        state_eepose[1:,:3],
+                        euler_to_6d(state_eepose[1:,3:6]),
+                        state_eepose[1:,[6]],
+                    ],
+                    axis=-1
+                )
+
+                ## compute state qpos
+                ### 1, get state qpos
+                ### 2, transfer state  
+                target_qpos_indices = [state_column_names.index(dim) for dim in qpos_target_names]
+                state_qpos = np.array([[lst[idx] for idx in target_qpos_indices] for lst in state])
+
+                uuid = f"{self.info['robot_type']}_{df['task_index'][0]}_{df['episode_index'][0]}"
+                images_path = os.path.join(self.args.output_image_path, uuid)
+                os.makedirs(images_path, exist_ok=True)
+
+                ## directly use corobot record task name
+                task_name_json = self.common_record['task_name'].split('_')[0]
+
+                # 检查是否包含英文字母
+                if re.search(r'[a-zA-Z]', task_name_json):
+                    # 如果包含英文，提取开头的英文部分
+                    match = re.match(r'^[a-zA-Z\s.]+', task_name_json)
+                    raw_task = match.group() if match else task_name_json
+                    sub_task = match.group() if match else task_name_json
+                else:
+                    # 如果不包含英文，直接使用原字符串
+                    raw_task = task_name_json
+                    sub_task = task_name_json
+
+                ## split trajectory
+                json_entries = []
+                start = int(df['frame_index'][0])
+                end = len(df['frame_index']) - 1
+                construct_num = max(1, end+self.args.padding-self.args.chunk)
+                
+                ## save video frame
+                result = self.save_video_frames(
+                    video_paths=[front_mp4_path, wrist_mp4_path],
+                    output_dir=images_path,
+                    start_frame=start,
+                    end_frame=end,
+                    image_format="jpg",
+                )
+                if not result:
+                    return []
+
+                for i in range(construct_num):
+                    # 选择分块索引 - 用min确保不超出边界
+                    index = [min(i + j, end - 1) for j in range(self.args.chunk + 1)]
+                    # 获取过滤后的数据块
+                    action_eepose_chunk = action_eepose[index]
+                    action_qpos_chunk = action_qpos[index]
+                    state_eepose_chunk = state_eepose[index]
+                    state_qpos_chunk = state_qpos[index]
+                    # 计算delta – 确保形状匹配
+                    try:
+                        action_eepose_delta = np.concatenate(
+                            [
+                                action_eepose_chunk[1:, :3] - action_eepose_chunk[:-1, :3],
+                                compute_d6_axis_angle_deltas(euler_to_6d(action_eepose_chunk[:, 3:6])),
+                                action_eepose_chunk[1:, [6]],
+                            ],
+                            axis=-1,
+                        )
+                        action_qpos_delta = np.concatenate(
+                            [
+                                action_qpos_chunk[1:, :7] - action_qpos_chunk[:-1, :7],
+                                action_qpos_chunk[1:, [7]],
+                            ],
+                            axis=-1,
+                        )
+                    except Exception as exc:
+                        print("Failed to build action delta for item %s/%s – %s", uuid, i, exc)
+                        continue
+                        
+                    nor_action_delta = self.transform(action_eepose_delta, self.action_eepose_scale, self.action_eepose_offset)
+                    nor_action_qpos = self.transform(action_qpos_delta, self.action_qpos_scale, self.action_qpos_offset)
+
+                    state_eepose_chunk = state_eepose_chunk[:-1]
+                    state_qpos_chunk = state_qpos_chunk[:-1]
+                    # 保存数组
+                    # 保持0为关闭，大于1为打开
+                    # 使用inverse的gripper动作作为action token
+                    action_eepose_token = action_tokenizer.process_action_chunk_to_fast_token(nor_action_delta)
+                    action_qpos_token = action_tokenizer.process_action_chunk_to_fast_token(nor_action_qpos)
+
+                    image_path_list = [
+                        os.path.join(images_path, f"{view}_{i}.jpg")
+                        for view in ["observation_images_image_front", "observation_images_image_wrist"]
+                    ]
+
+                    # construct data item
+                    action_str_list = ['<action_token>'] * 1
+                    action_str = '<action_split>'.join(action_str_list)
+                    json_item = {
+                        "sample_id": f"{uuid}_{i}",
+                        "raw_task": raw_task,
+                        "task": sub_task,
+                        "image": image_path_list,
+                        "action_eepose_token": action_eepose_token,
+                        "action_qpos_token": action_qpos_token,
+                        "state":{
+                            "eepose": state_eepose_chunk.tolist(),
+                            "qpos":state_qpos_chunk.tolist(),
+                        },
+                        "action":{
+                            "eepose": action_eepose_delta.tolist(),
+                            "qpos": action_qpos_delta.tolist(),
+                        },
+                        "conversations": [
+                            {
+                                "from": "human",
+                                "value": "".join(PROMPT).format(lan=sub_task.lower())
+                            },
+                            {
+                                "from": "gpt",
+                                "value": action_str
+                            }
+                        ]
+                    }
+                    json_entries.append(json_item)
+
+                ## store training samples
+                for json_item in json_entries:
+                    json_line = json.dumps(json_item)
+                    self.json_file_writer.write(json_line+'\n')
+            except Exception as e:
+                continue
 
 
     def run(self):

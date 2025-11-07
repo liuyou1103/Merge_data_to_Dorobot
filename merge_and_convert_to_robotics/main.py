@@ -126,9 +126,9 @@ if __name__ == "__main__":
 
     # 合并前数据父路径（会自动检测该目录下的数据目录，判断是否需要合并，合并后会打上合并标签，下次不会再合并）
     # 示例：single_path下，存在数据文件夹："水果收纳","餐具收纳","衣物收纳"
-    single_path = Path("/home/liuyou/Documents/single_data/")
+    single_path = Path("/home/liuyou/Documents/data/data/data/contest/")
     # 也可以选择传递具体数据文件夹名
-    single_folder_name = ["Place the object into the container_PNP_1104_603"]
+    single_folder_name = ["pick the banana into the basket_object classification_527"]
 
     # 合并后数据路径,会自动拼接标识子目录
     merge_path = Path("/home/liuyou/Documents/merge_data")
