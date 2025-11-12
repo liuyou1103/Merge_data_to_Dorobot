@@ -1,8 +1,8 @@
-# 项目名称: Merge_data_to_Dorobot
+# 项目名称: Merge_data_to_Corobot
 
 ## 📌 项目简介
-这是一个基于 Python 3.10+ 的数据处理工具，用于合并 **Dorobot** 数据（基于 lerobotv2.1），增加传感器数据和参数文件支持。  
-**功能**：将多个单条 Dorobot 数据合并为整体结构。
+这是一个基于 Python 3.10+ 的数据处理工具，用于合并 **Corobot** 数据（基于 lerobotv2.1），增加传感器数据和参数文件支持。  
+**功能**：将多个单条 Corobot 数据合并为整体结构。
 
 ---
 
