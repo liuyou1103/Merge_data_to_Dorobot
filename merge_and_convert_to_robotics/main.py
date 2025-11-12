@@ -139,7 +139,6 @@ if __name__ == "__main__":
     log_path = Path("/home/liuyou/Documents/logs/")
 
     output_type_list = ['CoRobot','Robotics_Franka'] # 提供的输出的数据类型
-
-    output_type = 'Robotics_Franka'
+    output_type = 'Robotics_Franka'  # jsonl数据格式
 
     handle_single_data(single_path, single_folder_name, merge_path, log_file, log_path, output_type)
